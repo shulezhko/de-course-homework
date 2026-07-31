@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Engineering: Python & SQL — Навчальний посібник (Lessons 02–03)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'dark'});</script>
+<style>
+:root{--bg:#0f1117;--bg2:#161b22;--bg3:#1c2128;--card:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--blue:#58a6ff;--green:#3fb950;--purple:#bc8cff;--orange:#d29922;--red:#f85149;--cyan:#39d353;--yellow:#e3b341;--code-bg:#0d1117;--sidebar-w:260px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;display:flex;min-height:100vh}
+/* Sidebar */
+.sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:1.5rem 1rem;z-index:100}
+.sidebar h2{font-size:1rem;color:var(--blue);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.sidebar a{display:block;color:var(--text2);text-decoration:none;font-size:.85rem;padding:.3rem .5rem;border-radius:4px;margin-bottom:2px}
+.sidebar a:hover{background:var(--bg3);color:var(--text)}
+.sidebar .sec{margin-top:.8rem;font-size:.75rem;color:var(--purple);text-transform:uppercase;letter-spacing:.05em;padding-left:.5rem}
+/* Main */
+main{margin-left:var(--sidebar-w);padding:2rem 3rem;max-width:900px;width:100%}
+h1{font-size:2rem;color:var(--blue);margin-bottom:.5rem}
+h2{font-size:1.5rem;color:var(--purple);margin:2.5rem 0 1rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+h3{font-size:1.2rem;color:var(--cyan);margin:1.5rem 0 .7rem}
+h4{font-size:1rem;color:var(--orange);margin:1rem 0 .5rem}
+p{margin-bottom:.8rem;color:var(--text2)}
+strong{color:var(--text)}
+a{color:var(--blue)}
+ul,ol{margin:.5rem 0 1rem 1.5rem;color:var(--text2)}
+li{margin-bottom:.3rem}
+/* Code */
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:1rem;overflow-x:auto;margin:1rem 0;font-size:.85rem;line-height:1.5}
+code{font-family:'JetBrains Mono','Fira Code',monospace;color:var(--green)}
+pre code{color:var(--text)}
+.kw{color:var(--purple);font-weight:600}.fn{color:var(--blue)}.str{color:var(--green)}.cm{color:var(--text2);font-style:italic}.num{color:var(--orange)}
+/* Side-by-side */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.compare>div{background:var(--bg3);border-radius:8px;padding:.8rem;border:1px solid var(--border)}
+.compare h5{font-size:.8rem;color:var(--yellow);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.03em}
+@media(max-width:900px){.compare{grid-template-columns:1fr}}
+/* Cards */
+.card{background:var(--card);border-radius:10px;padding:1.2rem;margin:1.2rem 0;border:1px solid var(--border)}
+.callout{border-left:3px solid var(--orange);padding-left:1rem;margin:1rem 0;color:var(--text2)}
+.callout-tip{border-left-color:var(--green)}
+.callout-warn{border-left-color:var(--red)}
+table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.85rem}
+th,td{padding:.6rem .8rem;border:1px solid var(--border);text-align:left}
+th{background:var(--bg3);color:var(--cyan)}
+td{color:var(--text2)}
+.badge{display:inline-block;padding:.15rem .6rem;border-radius:12px;font-size:.75rem;font-weight:600}
+.badge-py{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-sql{background:rgba(188,140,255,.15);color:var(--purple)}
+.mermaid{margin:1.5rem 0;text-align:center}
+@media(max-width:768px){.sidebar{display:none}main{margin-left:0;padding:1rem}}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+<h2>&#128218; Навігація</h2>
+<div class="sec">Огляд</div>
+<a href="#setup">Налаштування середовища</a>
+<a href="#overview">Python vs SQL: огляд</a>
+<div class="sec">Lesson 02: Python</div>
+<a href="#formats">Формати даних</a>
+<a href="#eager-lazy">Eager vs Lazy execution</a>
+<a href="#pushdown">Predicate Pushdown</a>
+<a href="#medallion">Medallion Architecture</a>
+<a href="#hw02">ДЗ Lesson 02: розбір</a>
+<div class="sec">Lesson 03: SQL + dbt</div>
+<a href="#duckdb">DuckDB та Schema-on-Write</a>
+<a href="#window">Window Functions</a>
+<a href="#dbt">dbt: SQL як код</a>
+<a href="#pruning">Partition Pruning</a>
+<a href="#hw03">ДЗ Lesson 03: розбір</a>
+<div class="sec">Довідка</div>
+<a href="#cheatsheet">Шпаргалка SQL↔Python</a>
+<a href="#mistakes">Типові помилки</a>
+</nav>
+<main>
+<h1>Data Engineering: Python & SQL</h1>
+<p style="color:var(--text2)">Навчальний посібник до занять 02–03 курсу Robot Dreams</p>
+
+<!-- ===== SETUP ===== -->
+<h2 id="setup">1. Налаштування середовища</h2>
+<div class="card">
+<h4>Чек-лист (з SETUP.md)</h4>
+<table>
+<tr><th>Інструмент</th><th>Команда перевірки</th><th>З якого заняття</th></tr>
+<tr><td><strong>uv</strong></td><td><code>uv --version</code></td><td>01</td></tr>
+<tr><td><strong>Python 3.12</strong></td><td><code>uv run python --version</code></td><td>02</td></tr>
+<tr><td><strong>Git</strong></td><td><code>git --version</code></td><td>01</td></tr>
+<tr><td><strong>GitHub SSH</strong></td><td><code>ssh -T git@github.com</code></td><td>01</td></tr>
+<tr><td><strong>VS Code</strong></td><td><code>code --version</code></td><td>01</td></tr>
+<tr><td><strong>Docker</strong></td><td><code>docker run hello-world</code></td><td>07+</td></tr>
+</table>
+<div class="callout callout-tip">
+<strong>Порада:</strong> Використовуй тільки <code>uv run python</code>, ніколи <code>python3</code> напряму — це гарантує правильне середовище.
+</div>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<h2 id="overview">2. Python vs SQL: два підходи до даних</h2>
+<p>Data Engineer працює з даними двома шляхами. Розуміння паралелей між ними — ключ до ефективності.</p>
+
+<div class="compare">
+<div>
+<h5>&#128013; Python (Polars / Pandas)</h5>
+<ul>
+<li>Дані у пам'яті (DataFrame)</li>
+<li>Процедурний / функціональний стиль</li>
+<li>Eager або Lazy evaluation</li>
+<li>Формати: Parquet, JSON, CSV</li>
+<li>Масштаб: один вузол (до ~100GB)</li>
+</ul>
+</div>
+<div>
+<h5>&#128451; SQL (DuckDB / PostgreSQL)</h5>
+<ul>
+<li>Дані в движку СУБД</li>
+<li>Декларативний стиль</li>
+<li>Query planner оптимізує автоматично</li>
+<li>Формати: таблиці, views, Parquet (DuckDB)</li>
+<li>Масштаб: залежить від движка</li>
+</ul>
+</div>
+</div>
+
+<div class="mermaid">
+graph LR
+    A[Raw Data<br/>NDJSON / Parquet] -->|Python<br/>Polars| B[Landing Zone]
+    B -->|Python ETL| C[Bronze → Silver → Gold]
+    A -->|SQL<br/>DuckDB read_parquet| D[DuckDB Tables]
+    D -->|dbt models| E[Bronze → Silver → Gold]
+    C --> F[Analytics]
+    E --> F
+    style A fill:#161b22,stroke:#58a6ff
+    style F fill:#161b22,stroke:#3fb950
+</div>
+
+<!-- ===== FORMATS ===== -->
+<h2 id="formats">3. Формати даних: CSV → JSON → Parquet</h2>
+
+<table>
+<tr><th>Характеристика</th><th>CSV</th><th>JSON/NDJSON</th><th>Parquet</th></tr>
+<tr><td>Тип</td><td>Текстовий, рядковий</td><td>Текстовий, ієрархічний</td><td>Бінарний, колонковий</td></tr>
+<tr><td>Схема</td><td>Немає</td><td>Немає (слабка)</td><td><strong>Вбудована</strong> (footer)</td></tr>
+<tr><td>Стиснення</td><td>Погане</td><td>Погане</td><td><strong>Відмінне</strong> (Snappy/Zstd)</td></tr>
+<tr><td>Projection pushdown</td><td>Ні</td><td>Ні</td><td><strong>Так</strong></td></tr>
+<tr><td>Людська читабельність</td><td>Так</td><td>Так</td><td>Ні</td></tr>
+<tr><td>Використання</td><td>Довідники, export</td><td>API, events</td><td><strong>Аналітика, storage</strong></td></tr>
+</table>
+
+<div class="mermaid">
+graph TB
+    subgraph "Parquet File"
+        RG1[Row Group 1<br/>col1 chunk | col2 chunk | col3 chunk]
+        RG2[Row Group 2<br/>col1 chunk | col2 chunk | col3 chunk]
+        FT[Footer<br/>Schema + Min/Max Statistics]
+    end
+    Q[Query: SELECT col2 WHERE col2 > 100] --> FT
+    FT -->|"Skip RG1 (max=80)"| RG2
+    style FT fill:#21262d,stroke:#d29922
+    style Q fill:#161b22,stroke:#58a6ff
+</div>
+
+<div class="callout callout-tip">
+<strong>Правило:</strong> Parquet — для аналітичного зберігання. Avro — для потокових подій (Kafka). CSV/JSON — для людей і API.
+</div>
+
+<!-- ===== EAGER vs LAZY ===== -->
+<h2 id="eager-lazy">4. Eager vs Lazy Execution</h2>
+
+<div class="compare">
+<div>
+<h5>Pandas (Eager)</h5>
+<pre><code><span class="cm"># Все читається у RAM одразу</span>
+df = pd.read_parquet(<span class="str">"trips.parquet"</span>)
+<span class="cm"># Фільтрація — після повного завантаження</span>
+result = df[df[<span class="str">"fare"</span>] > <span class="num">0</span>]</code></pre>
+<p>Кожна операція виконується <strong>негайно</strong>. Весь файл у пам'яті.</p>
+</div>
+<div>
+<h5>Polars (Lazy)</h5>
+<pre><code><span class="cm"># Лише план — 0 байт даних!</span>
+lf = pl.scan_parquet(<span class="str">"trips.parquet"</span>)
+<span class="cm"># Будуємо план без IO</span>
+result = lf.filter(pl.col(<span class="str">"fare"</span>) > <span class="num">0</span>)
+<span class="cm"># IO тільки тут:</span>
+df = result.collect()</code></pre>
+<p>Дані читаються при <code>.collect()</code> з оптимізаціями.</p>
+</div>
+</div>
+
+<h3 id="pushdown">Predicate & Projection Pushdown</h3>
+<p>Коли Polars (або DuckDB) будує план запиту, оптимізатор <strong>переміщує фільтри до рівня сканування файлу</strong>. Row groups, що не задовольняють умову (за min/max статистикою у footer), навіть не читаються.</p>
+
+<div class="compare">
+<div>
+<h5>&#128013; Polars</h5>
+<pre><code>lf = pl.scan_parquet(<span class="str">"events.parquet"</span>)
+plan = (
+    lf.filter(pl.col(<span class="str">"fare"</span>) > <span class="num">0</span>)
+      .select([<span class="str">"pickup_dt"</span>, <span class="str">"fare"</span>])
+)
+<span class="fn">print</span>(plan.explain(optimized=<span class="kw">True</span>))
+<span class="cm"># PARQUET SCAN [...] 
+# PROJECT 2/19 COLUMNS
+# SELECTION: col("fare") > 0</span></code></pre>
+</div>
+<div>
+<h5>&#128451; DuckDB SQL</h5>
+<pre><code><span class="kw">EXPLAIN ANALYZE</span>
+<span class="kw">SELECT</span> pickup_dt, fare
+<span class="kw">FROM</span> <span class="fn">read_parquet</span>(<span class="str">'events.parquet'</span>)
+<span class="kw">WHERE</span> fare > <span class="num">0</span>;
+<span class="cm">-- Plan показує:
+-- PARQUET_SCAN [projection: 2 cols]
+-- Filter: fare > 0 (pushdown)</span></code></pre>
+</div>
+</div>
+
+<div class="callout callout-tip">
+<strong>Те саме явище — дві мови.</strong> І Polars, і DuckDB використовують Parquet footer statistics для пропуску непотрібних row groups. Різниця лише в синтаксисі.
+</div>
+
+<!-- ===== MEDALLION ===== -->
+<h2 id="medallion">5. Medallion Architecture</h2>
+<p>Стандартний патерн організації даних у Lakehouse:</p>
+
+<div class="mermaid">
+graph LR
+    L[Landing<br/>Raw файли<br/>Незмінні] -->|Flatten<br/>Parse types| B[Bronze<br/>Пласка таблиця<br/>Усі рядки]
+    B -->|DQ фільтри<br/>Dedup| S[Silver<br/>Чисті дані<br/>Контракт схеми]
+    S -->|Агрегації<br/>Joins| G[Gold<br/>Аналітика<br/>Бізнес-метрики]
+    style L fill:#161b22,stroke:#d29922
+    style B fill:#161b22,stroke:#d29922
+    style S fill:#161b22,stroke:#58a6ff
+    style G fill:#161b22,stroke:#3fb950
+</div>
+
+<div class="compare">
+<div>
+<h5>&#128013; Python (Polars) — Lesson 02 HW</h5>
+<pre><code><span class="cm"># Bronze: flatten NDJSON</span>
+df = pl.scan_ndjson(file, schema=SCHEMA)
+bronze = df.select(
+    pl.col(<span class="str">"id"</span>).alias(<span class="str">"event_id"</span>),
+    pl.col(<span class="str">"actor"</span>).struct.field(<span class="str">"login"</span>),
+    ...
+).collect()
+
+<span class="cm"># Silver: filter + dedup</span>
+silver = bronze.lazy()
+    .filter(pl.col(<span class="str">"event_type"</span>).is_in(TYPES))
+    .unique(subset=[<span class="str">"event_id"</span>])
+    .collect()
+
+<span class="cm"># Gold: aggregate</span>
+gold = silver.lazy()
+    .group_by(<span class="str">"repo_name"</span>)
+    .agg(pl.col(<span class="str">"event_id"</span>).count())
+    .collect()</code></pre>
+</div>
+<div>
+<h5>&#128451; SQL (dbt) — Lesson 03 HW</h5>
+<pre><code><span class="cm">-- Bronze (stg_events): read + filter</span>
+<span class="kw">SELECT</span> id, event_type, ...
+<span class="kw">FROM</span> <span class="fn">read_parquet</span>(<span class="str">'events/**'</span>,
+    hive_partitioning=<span class="kw">true</span>)
+<span class="kw">WHERE</span> event_type <span class="kw">IN</span> (...)
+  <span class="kw">AND</span> actor_login <span class="kw">NOT LIKE</span> <span class="str">'%[bot]'</span>
+
+<span class="cm">-- Silver → Gold: aggregate</span>
+<span class="kw">SELECT</span> repo_name,
+    <span class="fn">COUNT</span>(*) <span class="kw">AS</span> event_count
+<span class="kw">FROM</span> {{ ref(<span class="str">'stg_events'</span>) }}
+<span class="kw">GROUP BY</span> repo_name</code></pre>
+</div>
+</div>
+
+<!-- ===== HW02 ===== -->
+<h2 id="hw02">6. ДЗ Lesson 02: ETL Pipeline (Polars)</h2>
+<p>Завдання: побудувати ETL pipeline на Polars, що перетворює годину подій GitHub Archive (NDJSON) у аналітичні Parquet-таблиці.</p>
+
+<h3>Task 1: Bronze — Flatten NDJSON</h3>
+<div class="card">
+<p><strong>Суть:</strong> Розгорнути вкладений JSON у пласку таблицю. Жодної фільтрації.</p>
+<pre><code><span class="kw">def</span> <span class="fn">build_bronze</span>():
+    df = pl.scan_ndjson(config.LANDING_FILE, schema=config.LANDING_SCHEMA)
+    bronze = df.select(
+        pl.col(<span class="str">"id"</span>).alias(<span class="str">"event_id"</span>),
+        pl.col(<span class="str">"type"</span>).alias(<span class="str">"event_type"</span>),
+        pl.col(<span class="str">"actor"</span>).struct.field(<span class="str">"id"</span>).alias(<span class="str">"actor_id"</span>),
+        pl.col(<span class="str">"actor"</span>).struct.field(<span class="str">"login"</span>).alias(<span class="str">"actor_login"</span>),
+        pl.col(<span class="str">"repo"</span>).struct.field(<span class="str">"id"</span>).alias(<span class="str">"repo_id"</span>),
+        pl.col(<span class="str">"repo"</span>).struct.field(<span class="str">"name"</span>).alias(<span class="str">"repo_name"</span>),
+        pl.col(<span class="str">"created_at"</span>).str.to_datetime(<span class="str">"%Y-%m-%dT%H:%M:%SZ"</span>, time_zone=<span class="str">"UTC"</span>),
+        pl.col(<span class="str">"public"</span>),
+        pl.col(<span class="str">"payload"</span>).struct.field(<span class="str">"action"</span>).alias(<span class="str">"action"</span>),
+        pl.col(<span class="str">"payload"</span>).struct.field(<span class="str">"commits"</span>)
+            .list.len().fill_null(<span class="num">0</span>).alias(<span class="str">"commit_count"</span>),
+    ).collect()
+    bronze.write_parquet(config.BRONZE_FILE)
+    <span class="kw">return</span> bronze</code></pre>
+<div class="callout callout-tip"><strong>Ключові прийоми:</strong>
+<code>.struct.field("login")</code> — доступ до вкладеного поля Struct;
+<code>.list.len().fill_null(0)</code> — довжина масиву комітів (для не-Push подій = null → 0).</div>
+<p><strong>Checkpoint:</strong> 267 250 рядків.</p>
+</div>
+
+<h3>Task 2–3: Silver — DQ Filter + Hive Partitioning</h3>
+<div class="card">
+<p><strong>Суть:</strong> Очистити bronze: залишити 5 типів подій, прибрати null/порожні, гарантувати унікальність.</p>
+<pre><code><span class="kw">def</span> <span class="fn">build_silver</span>(bronze_df):
+    silver = (
+        bronze_df.lazy()
+        .filter(pl.col(<span class="str">"event_type"</span>).is_in(config.TARGET_EVENT_TYPES))
+        .filter(pl.col(<span class="str">"repo_name"</span>).is_not_null() & (pl.col(<span class="str">"repo_name"</span>) != <span class="str">""</span>))
+        .filter(pl.col(<span class="str">"event_id"</span>).is_not_null())
+        .filter(pl.col(<span class="str">"created_at"</span>).is_not_null())
+        .unique(subset=[<span class="str">"event_id"</span>])
+        .collect()
+    )
+    silver.write_parquet(config.SILVER_FILE)
+    <span class="cm"># Hive-партиціонування:</span>
+    silver.write_parquet(config.SILVER_PARTITIONED_DIR, partition_by=[<span class="str">"event_type"</span>])
+    <span class="kw">return</span> silver</code></pre>
+<p><strong>Checkpoint:</strong> 211 466 рядків, 5 партицій.</p>
+</div>
+
+<h3>Task 4–6: Gold — Аналітичні агрегації</h3>
+<div class="card">
+<div class="compare">
+<div>
+<h5>repo_activity</h5>
+<pre><code>silver.lazy()
+  .group_by(<span class="str">"repo_name"</span>)
+  .agg(
+    pl.col(<span class="str">"event_id"</span>).count()
+      .alias(<span class="str">"event_count"</span>),
+    pl.col(<span class="str">"event_type"</span>).n_unique()
+      .alias(<span class="str">"distinct_event_types"</span>)
+  )
+  .sort(<span class="str">"event_count"</span>, descending=<span class="kw">True</span>)
+  .collect()</code></pre>
+<p>67 143 рядки</p>
+</div>
+<div>
+<h5>activity_per_minute</h5>
+<pre><code>silver.lazy()
+  .with_columns(
+    pl.col(<span class="str">"created_at"</span>)
+      .dt.truncate(<span class="str">"1m"</span>)
+      .alias(<span class="str">"minute"</span>)
+  )
+  .group_by(<span class="str">"minute"</span>)
+  .agg(pl.col(<span class="str">"event_id"</span>).count()
+      .alias(<span class="str">"event_count"</span>))
+  .sort(<span class="str">"minute"</span>)
+  .collect()</code></pre>
+<p>60 рядків (1 година)</p>
+</div>
+</div>
+<pre><code><span class="cm"># push_commits_by_repo — лише PushEvent</span>
+silver.lazy()
+  .filter(pl.col(<span class="str">"event_type"</span>) == <span class="str">"PushEvent"</span>)
+  .group_by(<span class="str">"repo_name"</span>)
+  .agg(
+    pl.col(<span class="str">"event_id"</span>).count().alias(<span class="str">"push_events"</span>),
+    pl.col(<span class="str">"commit_count"</span>).sum().alias(<span class="str">"total_commits"</span>)
+  ).collect()</code></pre>
+<p><strong>Checkpoint:</strong> 52 759 рядків, sum(total_commits) = 232 047.</p>
+</div>
+
+<!-- ===== LESSON 03 SECTION ===== -->
+<h2 id="duckdb">7. DuckDB та Schema-on-Write</h2>
+
+<p>На занятті 03 ми переходимо від Python-pipeline до <strong>SQL-first</strong> підходу. DuckDB — аналітичний движок, що читає Parquet напряму і виконує SQL без окремого сервера.</p>
+
+<div class="compare">
+<div>
+<h5>Schema-on-Read (Lesson 02)</h5>
+<pre><code><span class="cm"># Polars: схема з файлу</span>
+lf = pl.scan_parquet(<span class="str">"data.parquet"</span>)
+<span class="cm"># Типи виведені з footer</span>
+<span class="cm"># Погані дані не блокуються</span></code></pre>
+</div>
+<div>
+<h5>Schema-on-Write (Lesson 03)</h5>
+<pre><code><span class="cm">-- DuckDB: схема задається явно</span>
+<span class="kw">CREATE TABLE</span> bronze (
+  fare <span class="fn">DECIMAL</span>(<span class="num">10</span>,<span class="num">2</span>) <span class="kw">NOT NULL</span>,
+  <span class="kw">CHECK</span>(fare >= <span class="num">0</span>)
+);
+<span class="cm">-- Погані дані = помилка INSERT</span></code></pre>
+</div>
+</div>
+
+<h2 id="window">8. Window Functions: SQL vs Python</h2>
+<p>Window functions зберігають всі рядки (на відміну від GROUP BY, що колапсує). Це must-have для DE.</p>
+
+<div class="compare">
+<div>
+<h5>&#128451; SQL (DuckDB)</h5>
+<pre><code><span class="cm">-- Running total</span>
+<span class="kw">SELECT</span> event_date, events,
+  <span class="fn">SUM</span>(events) <span class="kw">OVER</span>(
+    <span class="kw">ORDER BY</span> event_date
+  ) <span class="kw">AS</span> running
+<span class="kw">FROM</span> daily;
+
+<span class="cm">-- Top-N per group</span>
+<span class="kw">SELECT</span> *, <span class="fn">ROW_NUMBER</span>() <span class="kw">OVER</span>(
+  <span class="kw">PARTITION BY</span> event_type
+  <span class="kw">ORDER BY</span> cnt <span class="kw">DESC</span>
+) <span class="kw">AS</span> rn
+<span class="kw">QUALIFY</span> rn &lt;= <span class="num">5</span>;
+
+<span class="cm">-- Day-over-day change</span>
+<span class="kw">SELECT</span> event_date,
+  <span class="fn">LAG</span>(events) <span class="kw">OVER</span>(
+    <span class="kw">ORDER BY</span> event_date
+  ) <span class="kw">AS</span> prev_day
+<span class="kw">FROM</span> daily;</code></pre>
+</div>
+<div>
+<h5>&#128013; Python (Polars)</h5>
+<pre><code><span class="cm"># Running total</span>
+df.with_columns(
+  pl.col(<span class="str">"events"</span>).cum_sum()
+    .alias(<span class="str">"running"</span>)
+)
+
+<span class="cm"># Top-N per group</span>
+df.with_columns(
+  pl.col(<span class="str">"cnt"</span>)
+    .rank(method=<span class="str">"ordinal"</span>, descending=<span class="kw">True</span>)
+    .over(<span class="str">"event_type"</span>)
+    .alias(<span class="str">"rn"</span>)
+).filter(pl.col(<span class="str">"rn"</span>) &lt;= <span class="num">5</span>)
+
+<span class="cm"># Day-over-day (shift)</span>
+df.with_columns(
+  pl.col(<span class="str">"events"</span>).shift(<span class="num">1</span>)
+    .alias(<span class="str">"prev_day"</span>)
+)</code></pre>
+</div>
+</div>
+
+<!-- ===== DBT ===== -->
+<h2 id="dbt">9. dbt: SQL як код</h2>
+<p>dbt перетворює SQL-запити у версіонований, тестований pipeline з автоматичним визначенням порядку виконання.</p>
+
+<div class="mermaid">
+graph LR
+    SRC[source<br/>read_parquet] --> STG[stg_events<br/>view]
+    SEED1[event_categories<br/>seed CSV] --> MART
+    SEED2[calendar<br/>seed CSV] --> MART
+    STG --> TOP[repo_top_events]
+    STG --> DA[daily_activity]
+    STG --> DAC[daily_activity_change]
+    STG --> STAR[starred_repos<br/>without_push]
+    STG --> MART[mart_category_daily]
+    STG --> RPT[report_category_week]
+    style SRC fill:#161b22,stroke:#d29922
+    style SEED1 fill:#161b22,stroke:#e3b341
+    style SEED2 fill:#161b22,stroke:#e3b341
+    style STG fill:#161b22,stroke:#58a6ff
+    style MART fill:#161b22,stroke:#3fb950
+    style RPT fill:#161b22,stroke:#bc8cff
+</div>
+
+<table>
+<tr><th>Концепт dbt</th><th>Аналог у Python</th><th>Призначення</th></tr>
+<tr><td><code>ref('model')</code></td><td><code>import module</code></td><td>Оголошення залежності (DAG)</td></tr>
+<tr><td><code>source()</code></td><td>Читання зовнішнього файлу</td><td>Посилання на raw-дані</td></tr>
+<tr><td><code>seed</code> (CSV)</td><td>Довідник як DataFrame</td><td>Маленькі lookup-таблиці в git</td></tr>
+<tr><td><code>materialized: view</code></td><td>Lazy plan (без матеріалізації)</td><td>Дешевий шар фільтрації</td></tr>
+<tr><td><code>materialized: table</code></td><td><code>.collect()</code> + write_parquet</td><td>Матеріалізовані дані</td></tr>
+<tr><td><code>dbt test</code></td><td>pytest + pandera</td><td>Перевірка інваріантів</td></tr>
+</table>
+
+<!-- ===== PRUNING ===== -->
+<h2 id="pruning">10. Partition Pruning</h2>
+<p>Якщо дані партиціоновані по колонці (Hive layout: <code>event_date=2024-01-08/</code>), движок може читати тільки потрібні партиції.</p>
+
+<div class="compare">
+<div>
+<h5>&#10007; Naive (сканує 14 файлів)</h5>
+<pre><code><span class="kw">JOIN</span> calendar c
+  <span class="kw">ON</span> <span class="fn">strftime</span>(e.event_date)
+   = <span class="fn">strftime</span>(c.day)
+<span class="kw">WHERE</span> c.iso_week = <span class="num">2</span>
+<span class="cm">-- Перетворення ключа JOIN
+-- блокує filter propagation</span></code></pre>
+</div>
+<div>
+<h5>&#10003; Optimized (сканує 7 файлів)</h5>
+<pre><code><span class="kw">JOIN</span> calendar c
+  <span class="kw">ON</span> e.event_date = c.day
+<span class="kw">WHERE</span> c.iso_week = <span class="num">2</span>
+<span class="cm">-- Прямий JOIN → DuckDB пропагує
+-- фільтр на партиційну колону</span></code></pre>
+</div>
+</div>
+
+<div class="callout callout-warn">
+<strong>Правило:</strong> Ніколи не перетворюйте ключ JOIN (strftime, CAST тощо), якщо хочете partition pruning. Прямий join по сирій колоні = оптимізатор може працювати.
+</div>
+
+<!-- ===== HW03 ===== -->
+<h2 id="hw03">11. ДЗ Lesson 03: dbt Models (розбір)</h2>
+
+<div class="card">
+<h4>Task 1: stg_events <span class="badge badge-sql">view</span></h4>
+<p>DQ-фільтрація сирих подій. Materialized: view — критично для наскрізного partition pruning.</p>
+<pre><code>{{ config(materialized=<span class="str">'view'</span>) }}
+<span class="kw">SELECT</span> id, event_type, created_at, event_date, actor_login, repo_name,
+       payload_commit_count, payload_action, payload_ref
+<span class="kw">FROM</span> <span class="fn">read_parquet</span>(<span class="str">'{{ var("events_path") }}'</span>, hive_partitioning = <span class="kw">true</span>)
+<span class="kw">WHERE</span> event_type <span class="kw">IN</span> (<span class="str">'PushEvent'</span>, <span class="str">'IssuesEvent'</span>, <span class="str">'PullRequestEvent'</span>,
+                       <span class="str">'WatchEvent'</span>, <span class="str">'IssueCommentEvent'</span>)
+  <span class="kw">AND</span> actor_login <span class="kw">NOT LIKE</span> <span class="str">'%[bot]'</span>
+  <span class="kw">AND NOT</span> (event_type = <span class="str">'PushEvent'</span> <span class="kw">AND</span> payload_commit_count = <span class="num">0</span>)</code></pre>
+</div>
+
+<div class="card">
+<h4>Task 2: repo_top_events <span class="badge badge-sql">QUALIFY</span></h4>
+<pre><code><span class="kw">SELECT</span> event_type, repo_name,
+  <span class="fn">COUNT</span>(*) <span class="kw">AS</span> event_count,
+  <span class="fn">ROW_NUMBER</span>() <span class="kw">OVER</span>(<span class="kw">PARTITION BY</span> event_type <span class="kw">ORDER BY</span> <span class="fn">COUNT</span>(*) <span class="kw">DESC</span>, repo_name) <span class="kw">AS</span> type_rank
+<span class="kw">FROM</span> {{ ref(<span class="str">'stg_events'</span>) }}
+<span class="kw">GROUP BY</span> event_type, repo_name
+<span class="kw">QUALIFY</span> type_rank &lt;= <span class="num">5</span></code></pre>
+</div>
+
+<div class="card">
+<h4>Task 5: starred_repos_without_push <span class="badge badge-sql">Anti-Join</span></h4>
+<pre><code><span class="kw">SELECT DISTINCT</span> w.repo_name
+<span class="kw">FROM</span> {{ ref(<span class="str">'stg_events'</span>) }} w
+<span class="kw">WHERE</span> w.event_type = <span class="str">'WatchEvent'</span>
+  <span class="kw">AND NOT EXISTS</span> (
+    <span class="kw">SELECT</span> <span class="num">1</span> <span class="kw">FROM</span> {{ ref(<span class="str">'stg_events'</span>) }} p
+    <span class="kw">WHERE</span> p.event_type = <span class="str">'PushEvent'</span> <span class="kw">AND</span> p.repo_name = w.repo_name
+  )</code></pre>
+<div class="callout callout-tip"><strong>Чому NOT EXISTS, а не NOT IN?</strong> NOT IN з підзапитом, що містить NULL, повертає пустий результат. NOT EXISTS — безпечний завжди.</div>
+</div>
+
+<!-- ===== CHEATSHEET ===== -->
+<h2 id="cheatsheet">12. Шпаргалка: SQL ↔ Python</h2>
+<table>
+<tr><th>Операція</th><th>SQL (DuckDB)</th><th>Python (Polars)</th></tr>
+<tr><td>Фільтрація</td><td><code>WHERE fare > 0</code></td><td><code>.filter(pl.col("fare") > 0)</code></td></tr>
+<tr><td>Вибір колонок</td><td><code>SELECT col1, col2</code></td><td><code>.select(["col1", "col2"])</code></td></tr>
+<tr><td>Нова колонка</td><td><code>SELECT *, col*2 AS dbl</code></td><td><code>.with_columns((pl.col("c")*2).alias("dbl"))</code></td></tr>
+<tr><td>Агрегація</td><td><code>GROUP BY + COUNT/SUM</code></td><td><code>.group_by().agg()</code></td></tr>
+<tr><td>Join</td><td><code>JOIN t2 ON t1.id = t2.id</code></td><td><code>.join(t2, on="id", how="left")</code></td></tr>
+<tr><td>Сортування</td><td><code>ORDER BY col DESC</code></td><td><code>.sort("col", descending=True)</code></td></tr>
+<tr><td>Дедуплікація</td><td><code>SELECT DISTINCT</code></td><td><code>.unique()</code></td></tr>
+<tr><td>Running total</td><td><code>SUM() OVER(ORDER BY)</code></td><td><code>.cum_sum()</code></td></tr>
+<tr><td>Попередній рядок</td><td><code>LAG() OVER(ORDER BY)</code></td><td><code>.shift(1)</code></td></tr>
+<tr><td>Top-N per group</td><td><code>ROW_NUMBER() + QUALIFY</code></td><td><code>.rank().over("group")</code></td></tr>
+<tr><td>Anti-join</td><td><code>NOT EXISTS / LEFT JOIN IS NULL</code></td><td><code>.join(how="anti")</code></td></tr>
+<tr><td>Truncate time</td><td><code>date_trunc('minute', ts)</code></td><td><code>.dt.truncate("1m")</code></td></tr>
+<tr><td>Partition write</td><td><code>COPY ... PARTITION_BY</code></td><td><code>.write_parquet(dir, partition_by=)</code></td></tr>
+</table>
+
+<!-- ===== MISTAKES ===== -->
+<h2 id="mistakes">13. Типові помилки та Best Practices</h2>
+<div class="card">
+<table>
+<tr><th>#</th><th>Помилка</th><th>Рішення</th></tr>
+<tr><td>1</td><td>float64 для грошей (IEEE 754 drift)</td><td>DECIMAL / Decimal для фінансових колонок</td></tr>
+<tr><td>2</td><td>Eager read великого файлу у pandas</td><td>Polars scan_parquet (lazy) або chunks</td></tr>
+<tr><td>3</td><td>NOT IN з NULL-підзапитом</td><td>NOT EXISTS або LEFT JOIN...IS NULL</td></tr>
+<tr><td>4</td><td>Хардкод імені таблиці в dbt</td><td>ref() — гарантує DAG і порядок виконання</td></tr>
+<tr><td>5</td><td>stg_events як table (блокує pruning)</td><td>materialized: view для staging</td></tr>
+<tr><td>6</td><td>Перетворення ключа JOIN</td><td>Прямий join по сирій колоні</td></tr>
+<tr><td>7</td><td>print() у Jupyter для DataFrames</td><td>Bare expression або ic() для скалярів</td></tr>
+<tr><td>8</td><td>Без timeout у requests</td><td>Завжди timeout= + raise_for_status()</td></tr>
+<tr><td>9</td><td>Повторне завантаження існуючого файлу</td><td>Ідемпотентність: if not path.exists()</td></tr>
+<tr><td>10</td><td>Забув .collect() у Polars</td><td>LazyFrame ≠ DataFrame; IO тільки при collect</td></tr>
+</table>
+</div>
+
+<div class="callout callout-tip" style="margin-top:2rem">
+<strong>Головна ідея двох занять:</strong> Python і SQL — це два синтаксиси для однієї і тієї ж логіки обробки даних. Вибір залежить від контексту: Python — для ETL/pipeline коду з бізнес-логікою; SQL (dbt) — для декларативних трансформацій у команді з версіонуванням і тестами.
+</div>
+
+</main>
+</body>
+</html>
