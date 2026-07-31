@@ -1,17 +1,22 @@
 -- =====================================================================
--- TASK 7 — report_category_week (20 балів). Специфікація: ../../MODELS.md → «report_category_week».
+-- TASK 7 — report_category_week (20 балів)
+-- Оптимізована версія report_category_week_naive.
 --
--- Поряд лежить report_category_week_naive.sql — він НАВМИСНО неоптимізований:
--- join до calendar по strftime(event_date) = strftime(day) перетворює ключ join,
--- через що DuckDB сканує всі 14 партицій (немає ні propagation, ні partition pruning).
---
--- Ваша задача: переписати ТОЙ САМИЙ запит так, щоб він повертав ІДЕНТИЧНІ рядки,
--- але читав лише 7 партицій. Підказка у MODELS.md (join по сирій партиційній колоні).
--- Перевірте план: EXPLAIN ANALYZE на скомпільованій моделі → «Total Files Read».
--- Контракт колонок нижче; заглушка повертає 0 рядків.
+-- Ключова зміна: join до calendar по СИРІЙ партиційній колоні
+-- (e.event_date = c.day) замість strftime-перетворення.
+-- Це дозволяє DuckDB пропагувати фільтр iso_week = 2 через join
+-- на партиційну колону event_date → partition pruning: 7 партицій замість 14.
 -- =====================================================================
+
 SELECT
-    NULL::BIGINT  AS iso_week,
-    NULL::VARCHAR AS category,
-    NULL::BIGINT  AS events
-WHERE false  -- TODO: оптимізований варіант report_category_week_naive (join по e.event_date = c.day)
+    c.iso_week,
+    cat.category,
+    COUNT(*) AS events
+FROM {{ ref('stg_events') }} e
+JOIN {{ ref('calendar') }} c
+    ON e.event_date = c.day
+JOIN {{ ref('event_categories') }} cat
+    ON e.event_type = cat.event_type
+WHERE c.iso_week = 2
+GROUP BY c.iso_week, cat.category
+ORDER BY cat.category
