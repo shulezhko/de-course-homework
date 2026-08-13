@@ -21,7 +21,10 @@ def _download(url, dest):
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {url} ...")
-    urllib.request.urlretrieve(url, dest)
+    req = urllib.request.Request(url, headers={"User-Agent": "gh-ingest/1.0"})
+    with urllib.request.urlopen(req) as resp, open(dest, "wb") as out:
+        while chunk := resp.read(1 << 20):
+            out.write(chunk)
     print(f"Saved to {dest} ({dest.stat().st_size/1_000_000:.1f} MB)")
     return dest
 
