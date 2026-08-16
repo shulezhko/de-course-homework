@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.git/
+.gitignore
+*.md
+.env
+.env.example
+screenshots/
+Dockerfile*
+docker-compose*.yml
+verify.sh
