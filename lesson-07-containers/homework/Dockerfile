@@ -1,22 +1,22 @@
 FROM python:3.12-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+# Залежності окремим шаром (зміна коду не тригерить переустановку pip)
+COPY app/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-RUN useradd --create-home --uid 1000 appuser
+# Non-root user
+RUN useradd -m -u 1000 appuser \
+    && mkdir -p /cache && chown appuser:appuser /cache
 
-WORKDIR /app
+# Код додаємо після pip install (cache-friendly)
+COPY app/ /app/
 
-COPY app/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY app/gh_ingest.py .
-
-RUN mkdir /cache && chown appuser:appuser /cache
+ENV PYTHONUNBUFFERED=1
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD ["python", "-c", "import sys; sys.exit(0)"]
+# Реальний healthcheck: перевіряємо чи Postgres досяжний
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
+    CMD python -c "import psycopg, os; psycopg.connect(host=os.environ.get('PGHOST','postgres'), port=os.environ.get('PGPORT','5432'), user=os.environ['PGUSER'], password=os.environ['PGPASSWORD'], dbname=os.environ['PGDATABASE']).close()" || exit 1
 
-ENTRYPOINT ["python", "gh_ingest.py"]
+ENTRYPOINT ["python", "/app/gh_ingest.py"]

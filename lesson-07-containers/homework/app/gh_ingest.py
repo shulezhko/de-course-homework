@@ -1,69 +1,135 @@
-"""GitHub Archive Ingestor — завантажує годину подій у PostgreSQL.
+"""GitHub Archive ingestor — download one hour, filter, load into Postgres.
 
-Дано. Не редагувати.
+Цей скрипт ВАМ дано. Не редагуйте його — ваша задача лише контейнеризувати його
+(Dockerfile) і запустити в стеку з Postgres (docker-compose.yml).
+
+Скрипт працює всередині контейнера `ingestor` і читає всі налаштування зі змінних
+середовища, які задає docker-compose:
+
+    PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE  -- підключення до Postgres
+    ARCHIVE_URL                                     -- яку годину GitHub Archive вантажити
+    CACHE_DIR                                        -- куди кешувати завантажений файл
+
+Завантаження ідемпотентне: якщо година вже в кеші — файл переписується.
+Запис ідемпотентний: цільова таблиця очищується (TRUNCATE) перед COPY.
 """
-import csv, gzip, io, json, os, sys, urllib.request
-from pathlib import Path
+
+from __future__ import annotations
+
+import gzip
+import json
+import logging
+import os
+import sys
+import urllib.request
+
 import psycopg
 
-ARCHIVE_URL = os.environ.get("ARCHIVE_URL", "https://data.gharchive.org/2024-01-15-14.json.gz")
-CACHE_DIR = Path(os.environ.get("CACHE_DIR", "/cache"))
-PGHOST = os.environ["PGHOST"]
-PGPORT = os.environ.get("PGPORT", "5432")
-PGUSER = os.environ["PGUSER"]
-PGPASSWORD = os.environ["PGPASSWORD"]
-PGDATABASE = os.environ["PGDATABASE"]
-TARGET_TYPES = frozenset(["PushEvent","PullRequestEvent","IssueCommentEvent","WatchEvent","IssuesEvent"])
+logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
+log = logging.getLogger("gh_ingest")
 
-def _download(url, dest):
-    if dest.exists():
-        print(f"Cache hit: {dest}")
+TARGET_EVENT_TYPES = {
+    "PushEvent",
+    "PullRequestEvent",
+    "IssuesEvent",
+    "WatchEvent",
+    "IssueCommentEvent",
+}
+
+ARCHIVE_URL = os.environ.get(
+    "ARCHIVE_URL", "https://data.gharchive.org/2024-01-15-14.json.gz"
+)
+CACHE_DIR = os.environ.get("CACHE_DIR", "/cache")
+
+DDL = """
+CREATE TABLE IF NOT EXISTS github_events (
+    id           TEXT PRIMARY KEY,
+    event_type   TEXT NOT NULL,
+    actor_login  TEXT,
+    repo_name    TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL
+);
+"""
+
+
+def download(url: str, dest_dir: str) -> str:
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, url.rsplit("/", 1)[-1])
+    if os.path.exists(dest):
+        log.info("Cache hit, reusing %s", dest)
         return dest
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Downloading {url} ...")
+    log.info("Downloading %s", url)
     req = urllib.request.Request(url, headers={"User-Agent": "gh-ingest/1.0"})
     with urllib.request.urlopen(req) as resp, open(dest, "wb") as out:
         while chunk := resp.read(1 << 20):
             out.write(chunk)
-    print(f"Saved to {dest} ({dest.stat().st_size/1_000_000:.1f} MB)")
+    log.info("Downloaded %.1f MB", os.path.getsize(dest) / 1e6)
     return dest
 
-def _parse_events(gz_path):
-    seen = set()
-    with gzip.open(gz_path, "rt", encoding="utf-8") as f:
-        for line in f:
-            ev = json.loads(line)
-            etype, eid = ev.get("type"), ev.get("id")
-            repo = (ev.get("repo") or {}).get("name", "")
-            if etype not in TARGET_TYPES or not repo or eid in seen:
-                continue
-            seen.add(eid)
-            yield {"event_id": eid, "event_type": etype,
-                   "actor_login": (ev.get("actor") or {}).get("login", ""),
-                   "repo_name": repo, "created_at": ev.get("created_at", "")}
 
-def main():
-    gz_path = _download(ARCHIVE_URL, CACHE_DIR / ARCHIVE_URL.rsplit("/",1)[-1])
-    print("Parsing events ...")
-    events = list(_parse_events(gz_path))
-    print(f"Filtered to {len(events)} events across {len(set(e['event_type'] for e in events))} types")
-    conninfo = f"host={PGHOST} port={PGPORT} user={PGUSER} password={PGPASSWORD} dbname={PGDATABASE}"
-    print(f"Connecting to PostgreSQL ({PGHOST}:{PGPORT}/{PGDATABASE}) ...")
-    with psycopg.connect(conninfo) as conn:
+def parse(path: str):
+    seen: set[str] = set()
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        for i, line in enumerate(fh, 1):
+            rec = json.loads(line)
+            if rec["type"] not in TARGET_EVENT_TYPES:
+                continue
+            event_id = rec["id"]
+            if event_id in seen:
+                continue
+            repo_name = rec["repo"]["name"]
+            if not repo_name:
+                continue
+            seen.add(event_id)
+            yield (
+                event_id,
+                rec["type"],
+                rec["actor"]["login"],
+                repo_name,
+                rec["created_at"],
+            )
+            if i % 50_000 == 0:
+                log.info("Read %d lines, kept %d", i, len(seen))
+
+
+def main() -> int:
+    conn_info = dict(
+        host=os.environ.get("PGHOST", "postgres"),
+        port=os.environ.get("PGPORT", "5432"),
+        user=os.environ["PGUSER"],
+        password=os.environ["PGPASSWORD"],
+        dbname=os.environ["PGDATABASE"],
+    )
+
+    src = download(ARCHIVE_URL, CACHE_DIR)
+
+    log.info(
+        "Connecting to Postgres at %s:%s/%s",
+        conn_info["host"],
+        conn_info["port"],
+        conn_info["dbname"],
+    )
+    with psycopg.connect(**conn_info) as conn:
         with conn.cursor() as cur:
-            cur.execute("CREATE TABLE IF NOT EXISTS github_events (event_id BIGINT PRIMARY KEY, event_type TEXT NOT NULL, actor_login TEXT NOT NULL, repo_name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL);")
-            cur.execute("TRUNCATE github_events;")
+            cur.execute(DDL)
+            cur.execute("TRUNCATE github_events")
+            copy_sql = (
+                "COPY github_events "
+                "(id, event_type, actor_login, repo_name, created_at) FROM STDIN"
+            )
+            loaded = 0
+            with cur.copy(copy_sql) as copy:
+                for row in parse(src):
+                    copy.write_row(row)
+                    loaded += 1
         conn.commit()
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        for e in events:
-            writer.writerow([e["event_id"], e["event_type"], e["actor_login"], e["repo_name"], e["created_at"]])
-        buf.seek(0)
         with conn.cursor() as cur:
-            with cur.copy("COPY github_events (event_id,event_type,actor_login,repo_name,created_at) FROM STDIN WITH CSV") as copy:
-                copy.write(buf.read())
-        conn.commit()
-    print(f"Done. Loaded {len(events)} rows into github_events.")
+            cur.execute("SELECT count(*) FROM github_events")
+            total = cur.fetchone()[0]
+
+    log.info("Done. Loaded %d rows (table now has %d).", loaded, total)
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
