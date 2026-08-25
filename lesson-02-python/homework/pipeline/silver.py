@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import polars as pl
 
 from . import config
@@ -25,19 +23,14 @@ def build_silver(bronze: pl.DataFrame) -> pl.DataFrame:
         .unique(subset=["event_id"])
     ).collect()
 
-    out = Path(config.SILVER_FILE)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    silver.write_parquet(out)
-
+    silver.write_parquet(config.SILVER_FILE, mkdir=True)
     return silver
 
 
 def write_silver_partitioned(silver: pl.DataFrame) -> None:
-    out_dir = Path(config.SILVER_PARTITIONED_DIR)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     # hive-партиціонування за event_type
     silver.write_parquet(
-        out_dir,
+        config.SILVER_PARTITIONED_DIR,
         partition_by=["event_type"],
+        mkdir=True,
     )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import polars as pl
 
 from . import config
@@ -34,9 +32,5 @@ def build_bronze() -> pl.DataFrame:
         .alias("commit_count"),
     ).collect()
 
-    # зберігаємо parquet
-    out = Path(config.BRONZE_FILE)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    bronze.write_parquet(out)
-
+    bronze.write_parquet(config.BRONZE_FILE, mkdir=True)
     return bronze
