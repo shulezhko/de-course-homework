@@ -4,11 +4,9 @@ on:
   push:
     branches:
       - feature/hw-lesson-13-spark
-    paths:
-      - "lesson-13-spark-structured-data-2/**"
   pull_request:
-    paths:
-      - "lesson-13-spark-structured-data-2/**"
+    branches:
+      - main
 
 jobs:
   verify:
