@@ -1,0 +1,50 @@
+name: Lesson 13 — Spark dbt lakehouse verify
+
+on:
+  push:
+    branches:
+      - feature/hw-lesson-13-spark
+    paths:
+      - "lesson-13-spark-structured-data-2/**"
+      - ".github/workflows/lesson-13-verify.yml"
+  pull_request:
+    paths:
+      - "lesson-13-spark-structured-data-2/**"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lesson-13-spark-structured-data-2/homework
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Run verify.sh
+        run: |
+          chmod +x verify.sh
+          ./verify.sh 2>&1 | tee /tmp/verify_out.txt
+
+      - name: Dump dbt logs on failure
+        if: failure()
+        run: |
+          echo "## verify.sh output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -80 /tmp/verify_out.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "## dbt run results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          find dbt_lakehouse/logs -name '*.log' -exec tail -60 {} \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
