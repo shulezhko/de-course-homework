@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - feature/hw-lesson-13-spark
+    paths:
+      - "lesson-13-spark-structured-data-2/**"
+      - ".github/workflows/lesson-13-verify.yml"
   pull_request:
-    branches:
-      - main
+    paths:
+      - "lesson-13-spark-structured-data-2/**"
 
 jobs:
   verify:
