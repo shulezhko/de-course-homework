@@ -1,0 +1,37 @@
+name: Lesson 12 — Spark verify
+
+on:
+  push:
+    branches:
+      - feature/hw-lesson-12-spark
+    paths:
+      - "lesson-12-spark-structured-data-1/**"
+  pull_request:
+    paths:
+      - "lesson-12-spark-structured-data-1/**"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lesson-12-spark-structured-data-1/homework
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync
+
+      - name: Run verify.sh
+        run: |
+          chmod +x verify.sh
+          ./verify.sh
