@@ -34,4 +34,16 @@ jobs:
       - name: Run verify.sh
         run: |
           chmod +x verify.sh
-          ./verify.sh
+          ./verify.sh 2>&1 | tee /tmp/verify_out.txt
+
+      - name: Dump dbt logs on failure
+        if: failure()
+        run: |
+          echo "## verify.sh output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -80 /tmp/verify_out.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "## dbt run results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          find dbt_lakehouse/logs -name '*.log' -exec tail -60 {} \; >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
