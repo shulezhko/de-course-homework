@@ -22,13 +22,19 @@ with_counts as (
     from parsed
 ),
 
+-- Spark SQL не має QUALIFY → підзапит з row_number
 latest as (
     select *
-    from with_counts
-    qualify row_number() over (
-        partition by repo_name, p.issue.number
-        order by event_at desc, event_id desc
-    ) = 1
+    from (
+        select
+            with_counts.*,
+            row_number() over (
+                partition by repo_name, p.issue.number
+                order by event_at desc, event_id desc
+            ) as rn
+        from with_counts
+    )
+    where rn = 1
 )
 
 select

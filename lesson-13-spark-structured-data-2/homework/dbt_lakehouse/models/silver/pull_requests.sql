@@ -13,13 +13,19 @@ with parsed as (
 ),
 
 -- беремо стан з останньої події по кожній PR
+-- Spark SQL не має QUALIFY → підзапит з row_number
 latest as (
     select *
-    from parsed
-    qualify row_number() over (
-        partition by repo_name, p.number
-        order by event_at desc, event_id desc
-    ) = 1
+    from (
+        select
+            parsed.*,
+            row_number() over (
+                partition by repo_name, p.number
+                order by event_at desc, event_id desc
+            ) as rn
+        from parsed
+    )
+    where rn = 1
 )
 
 select

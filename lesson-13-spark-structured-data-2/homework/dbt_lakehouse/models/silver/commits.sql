@@ -36,11 +36,19 @@ exploded as (
 
 -- один коміт може прийти в кількох push — лишаємо найраніший pushed_at
 -- tie-break за event_id обов'язковий для детермінованості
+-- Spark SQL не має QUALIFY → підзапит з row_number
+ranked as (
+    select
+        exploded.*,
+        row_number() over (
+            partition by commit_sha order by pushed_at, event_id
+        ) as rn
+    from exploded
+)
+
 select
     commit_sha, repo_name, pushed_by, branch,
     author_name, author_email, message, is_distinct,
     pushed_at, is_merge_commit, message_subject, message_length
-from exploded
-qualify row_number() over (
-    partition by commit_sha order by pushed_at, event_id
-) = 1
+from ranked
+where rn = 1

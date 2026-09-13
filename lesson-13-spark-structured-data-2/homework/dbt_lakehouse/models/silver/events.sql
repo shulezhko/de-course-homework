@@ -36,7 +36,16 @@ filtered as (
         and created_at is not null
 )
 
--- дедуп по event_id
-select *
-from filtered
-qualify row_number() over (partition by event_id order by _ingested_at) = 1
+-- дедуп по event_id (Spark SQL не має QUALIFY → підзапит з row_number)
+ranked as (
+    select
+        filtered.*,
+        row_number() over (partition by event_id order by _ingested_at) as rn
+    from filtered
+)
+
+select
+    event_id, event_type, actor_login, repo_name, repo_owner,
+    created_at, payload, _ingested_at, _source_file
+from ranked
+where rn = 1
