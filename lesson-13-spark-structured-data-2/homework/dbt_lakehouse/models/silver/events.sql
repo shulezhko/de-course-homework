@@ -34,7 +34,7 @@ filtered as (
         and id is not null
         and repo.name is not null
         and created_at is not null
-)
+),
 
 -- дедуп по event_id (Spark SQL не має QUALIFY → підзапит з row_number)
 ranked as (

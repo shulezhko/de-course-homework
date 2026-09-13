@@ -32,7 +32,7 @@ exploded as (
         length(c.message)                               as message_length
     from pushes
     lateral view explode(p.commits) t as c
-)
+),
 
 -- один коміт може прийти в кількох push — лишаємо найраніший pushed_at
 -- tie-break за event_id обов'язковий для детермінованості
