@@ -1,0 +1,43 @@
+name: Lesson 16 — Kafka streaming verify
+
+on:
+  push:
+    branches:
+      - feature/hw-lesson-16-streaming
+    paths:
+      - "lesson-16-stream-processing-1/**"
+      - ".github/workflows/lesson-16-verify.yml"
+  pull_request:
+    paths:
+      - "lesson-16-stream-processing-1/**"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lesson-16-stream-processing-1/homework
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run verify.sh
+        run: |
+          chmod +x verify.sh
+          ./verify.sh 2>&1 | tee /tmp/verify_out.txt
+
+      - name: Save run artifacts
+        if: always()
+        run: |
+          mkdir -p /tmp/artifacts
+          cp /tmp/verify_out.txt /tmp/artifacts/ 2>/dev/null || true
+          cp data/output/stats.json /tmp/artifacts/ 2>/dev/null || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l16-run
+          path: /tmp/artifacts
